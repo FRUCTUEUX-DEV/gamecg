@@ -1,19 +1,19 @@
 # syntax=docker/dockerfile:1
 #
-# Image UNIQUE pour tout le projet HerboQuiz : frontend (React/Vite), backend
-# (Laravel) et base de donnees (PostgreSQL), tous les trois dans le meme
-# conteneur, geres par supervisord. Pas de serveur web dedie (pas de nginx) :
-# le frontend est servi par le serveur integre de PHP, deja present pour
-# Laravel — un seul langage, un seul outil, rien de plus a apprendre.
+# Image UNIQUE pour le projet HerboQuiz : frontend (React/Vite) et backend
+# (Laravel) dans le meme conteneur, servis par UN SEUL processus
+# (`php artisan serve`, avec un server.php personnalise qui route aussi vers
+# le frontend construit). La base de donnees est EXTERNE (PostgreSQL gere
+# par Render) : ce conteneur ne fait que s'y connecter, il n'en heberge
+# aucune. Pas de nginx, pas de superviseur de processus.
 #
 # Construire (depuis la racine du projet, ou se trouve ce Dockerfile) :
 #   docker build -t herboquiz .
 #
 # Lancer :
-#   docker run -p 8000:8000 -p 8080:80 \
-#       -v herboquiz-pgdata:/var/lib/postgresql/data herboquiz
+#   docker run -p 8000:8000 herboquiz
 #
-# Frontend sur http://localhost:8080, API sur http://localhost:8000/api.
+# Le site (frontend + API sous /api) est alors sur http://localhost:8000.
 
 # ---------- Etape 1 : build des assets statiques du frontend ----------
 FROM node:22-alpine AS frontend-build
@@ -25,25 +25,17 @@ RUN npm ci
 
 COPY herboquiz_frontend/ ./
 
-# Doit rester joignable depuis le NAVIGATEUR : l'adresse publique de l'API
-# (port 8000 publie plus bas), pas une adresse interne au conteneur.
-ARG VITE_API_URL=http://localhost:8000/api
-ENV VITE_API_URL=$VITE_API_URL
+# Chemin relatif : frontend et API sont servis par le MEME processus sur le
+# MEME port, plus besoin d'une URL absolue vers un autre conteneur/port.
+ENV VITE_API_URL=/api
 RUN npm run build
 
-# ---------- Etape 2 : image finale (backend + frontend + Postgres) ----------
+# ---------- Etape 2 : image finale (backend + frontend) ----------
 FROM php:8.3-cli-alpine
 
-# supervisor   : tient les trois processus (postgres, laravel, frontend) ensemble
-# postgresql16 : la base de donnees, embarquee dans le meme conteneur
-#                (nom de paquet Alpine ; si le build echoue sur ce paquet,
-#                verifier "apk search postgresql" dans l'image de base
-#                utilisee, le numero de version suit celui d'Alpine)
-# su-exec      : execute des commandes sous l'utilisateur "postgres" (pas de sudo sur alpine)
+# postgresql-dev : en-tetes necessaires pour compiler pdo_pgsql (client
+# seulement — la base elle-meme est hebergee par Render, pas ici).
 RUN apk add --no-cache \
-        supervisor \
-        postgresql16 \
-        su-exec \
         postgresql-dev \
         libzip-dev \
         oniguruma-dev \
@@ -62,7 +54,6 @@ RUN apk add --no-cache \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# ----- Backend Laravel -----
 WORKDIR /var/www/html
 
 # Couche dependances separee du code : un changement de composer.json
@@ -81,18 +72,28 @@ COPY herboquiz_backend/ ./
 RUN composer dump-autoload --optimize --no-dev --no-scripts \
     && chmod -R ug+rwX storage bootstrap/cache
 
-# ----- Frontend (fichiers statiques deja construits a l'etape 1) -----
-COPY --from=frontend-build /app/dist /var/www/frontend
-# Petit routeur PHP (fallback SPA) : servi par le meme serveur integre, place
-# a cote des fichiers qu'il sert.
-COPY spa-router.php /var/www/frontend/spa-router.php
+# Frontend construit directement DANS public/ : le server.php personnalise
+# ci-dessous sert ces fichiers tels quels, et Laravel garde son index.php
+# pour les routes API. Un seul document root, un seul processus.
+COPY --from=frontend-build /app/dist/ ./public/
 
-# ----- Configuration systeme : supervisord, script de demarrage -----
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Remplace le server.php par defaut de Laravel (voir le fichier pour le
+# detail) : c'est lui que `php artisan serve` utilise des qu'il existe a la
+# racine du projet.
+COPY server.php ./server.php
+
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Valeurs par defaut, surchargeables via `docker run -e VAR=valeur`.
+# DB_URL est la chaine de connexion complete de la base Render ; Laravel la
+# parse directement ("postgresql://" est reconnu comme alias de "pgsql", voir
+# Illuminate\Support\ConfigurationUrlParser). DB_CONNECTION reste necessaire
+# pour selectionner le bloc "pgsql" de config/database.php.
+#
+# ATTENTION : ce mot de passe est en clair dans l'image. Ne PAS pousser cette
+# image vers un registre public ; sur une plateforme comme Render, passer
+# plutot DB_URL comme variable d'environnement du service, pas ici.
 ENV APP_NAME=HerboQuiz \
     APP_ENV=production \
     APP_KEY=base64:Ea4FadSBLzL2j/4QWQEAD4WSDr3NT5Y+K6UCU+eXGO4= \
@@ -102,24 +103,14 @@ ENV APP_NAME=HerboQuiz \
     LOG_CHANNEL=stack \
     LOG_LEVEL=warning \
     DB_CONNECTION=pgsql \
-    DB_HOST=127.0.0.1 \
-    DB_PORT=5432 \
-    DB_DATABASE=herboquiz \
-    DB_USERNAME=herboquiz \
-    DB_PASSWORD=herboquiz \
+    DB_URL=postgresql://gamecg_user:44l2HUGhxennLWkVbXKvGclgIrrDs5Ql@dpg-d9llld942hec739v9d8g-a/gamecg \
     SESSION_DRIVER=file \
     CACHE_STORE=file \
     QUEUE_CONNECTION=sync \
     SESSION_MINUTES=720 \
     HERBOQUIZ_PROPRIETAIRE=Kaido \
-    PGDATA=/var/lib/postgresql/data \
     DB_SEED=true
 
-# Volume pour que les donnees Postgres survivent a un `docker rm` /
-# reconstruction de l'image — sans lui, tout est perdu a chaque redemarrage.
-VOLUME ["/var/lib/postgresql/data"]
-
-EXPOSE 80 8000
+EXPOSE 8000
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf", "-n"]

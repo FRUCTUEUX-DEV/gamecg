@@ -1,6 +1,8 @@
 #!/bin/sh
-# Preparation avant de laisser la main a supervisord (laravel + frontend).
-# La base est externe (Render) : rien a initialiser localement, juste migrer.
+# Un seul processus a lancer (php artisan serve, qui sert aussi le frontend
+# via le server.php personnalise — voir server.php et le Dockerfile) : pas
+# besoin de superviseur. La base est externe (Render), rien a initialiser
+# localement, juste migrer.
 set -e
 
 echo "==> Migrations Laravel..."
@@ -11,5 +13,8 @@ if [ "$DB_SEED" = "true" ]; then
     php artisan db:seed --force
 fi
 
-echo "==> Demarrage de laravel + frontend..."
-exec "$@"
+# Render (et la plupart des plateformes Docker) fournissent le port a
+# ecouter via $PORT ; 8000 en repli pour un lancement local.
+PORT="${PORT:-8000}"
+echo "==> Demarrage sur le port ${PORT}..."
+exec php artisan serve --host=0.0.0.0 --port="$PORT"
