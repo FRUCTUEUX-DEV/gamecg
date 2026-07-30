@@ -1,0 +1,440 @@
+import { useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Copy, Check, Undo2, Flag, ChevronLeft, Trophy, MinusCircle, Medal, RotateCcw, Scale } from 'lucide-react'
+import { animationService } from '@/services/herboquizService'
+import { QUERY_KEYS } from '@/hooks/queryKeys'
+import { cn } from '@/utils/cn'
+
+/**
+ * L'ecran qui justifie toute l'application.
+ *
+ * Contexte reel : l'animateur est sur son telephone, dans un groupe Messenger
+ * qui attend, et il doit enchainer question apres question. Tout ici est plie
+ * a deux gestes et rien de plus :
+ *   1. copier la question pour la coller dans le groupe,
+ *   2. taper sur celui qui a trouve.
+ *
+ * Aucune saisie, aucun menu, aucune confirmation. Les cibles sont larges parce
+ * qu'on tape vite et a une main.
+ */
+export default function AnimationPage() {
+  const { t } = useTranslation()
+  const { mancheId } = useParams()
+  const qc = useQueryClient()
+  const [copie, setCopie] = useState(false)
+  // Ce qui vient d'etre valide, affiche un instant avant la suite.
+  const [flash, setFlash] = useState(null)
+  const [transition, setTransition] = useState(false)
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: QUERY_KEYS.animation(mancheId),
+    queryFn: () => animationService.vue(mancheId),
+    // Deux animateurs peuvent tenir deux poules en parallele : on rafraichit
+    // pour ne pas travailler sur un classement perime.
+    refetchInterval: 15000,
+  })
+
+  const rafraichir = () => qc.invalidateQueries({ queryKey: QUERY_KEYS.animation(mancheId) })
+
+  /**
+   * Attribution avec un temps de respiration.
+   *
+   * Sans lui, l'ecran sautait a la question suivante dans la milliseconde :
+   * l'animateur ne voyait pas ce qu'il venait de valider et ne savait pas si
+   * son appui avait ete pris. On affiche donc le point marque, puis on
+   * enchaine — le delai est court, mais il change tout.
+   */
+  const attribuer = useMutation({
+    mutationFn: (equipe) =>
+      animationService.attribuer(mancheId, {
+        equipe_id: equipe?.id ?? null,
+        question_id: data?.question?.id ?? null,
+      }),
+    onMutate: (equipe) => {
+      setFlash(equipe ? { libelle: equipe.libelle } : { aucun: true })
+      setTransition(true)
+    },
+    onSuccess: () => {
+      // On laisse le retour visible avant de basculer sur la suite.
+      setTimeout(() => {
+        rafraichir()
+        setFlash(null)
+        setTimeout(() => setTransition(false), 60)
+      }, 1100)
+    },
+    onError: () => { setFlash(null); setTransition(false) },
+  })
+
+  const annuler = useMutation({
+    mutationFn: () => animationService.annuler(mancheId),
+    onSuccess: rafraichir,
+  })
+
+  const terminer = useMutation({
+    mutationFn: () => animationService.terminer(mancheId),
+    onSuccess: rafraichir,
+  })
+
+  const rouvrir = useMutation({
+    mutationFn: () => animationService.rouvrir(mancheId),
+    onSuccess: rafraichir,
+  })
+
+  // Trancher (ou retirer, avec null) un barrage d'egalite parfaite.
+  const barrage = useMutation({
+    mutationFn: (equipeId) => animationService.barrage(mancheId, equipeId),
+    onSuccess: rafraichir,
+  })
+
+  // Penalite : retirer des points a une equipe (avec un motif).
+  const penalite = useMutation({
+    mutationFn: (payload) => animationService.penalite(mancheId, payload),
+    onSuccess: rafraichir,
+  })
+
+  // Penalite : toute l'equipe, ou un joueur precis (l'effet reste sur le total
+  // de l'equipe, mais on trace qui). L'effet sur le classement est le meme.
+  const penaliser = (ligne) => {
+    const eq = (data?.equipes ?? []).find((e) => e.id === ligne.equipe_id)
+    const membres = eq?.membres ?? []
+    let participant_id = null
+
+    if (membres.length > 1) {
+      const liste = ['0. ' + t('animation.penalite_equipe'),
+        ...membres.map((m, i) => `${i + 1}. ${m.nom_affiche}`)].join('\n')
+      const choix = prompt(`${t('animation.penalite_qui', { equipe: ligne.libelle })}\n${liste}`)
+      if (choix === null) return
+      const n = parseInt(choix, 10)
+      if (n >= 1 && n <= membres.length) participant_id = membres[n - 1].id
+    }
+
+    const points = parseInt(prompt(t('animation.penalite_combien', { equipe: ligne.libelle })), 10)
+    if (! points || points < 1) return
+    const motif = prompt(t('animation.penalite_motif')) || null
+    penalite.mutate({ equipe_id: ligne.equipe_id, participant_id, points, motif })
+  }
+
+  const copierQuestion = async () => {
+    if (!data?.question) return
+    await navigator.clipboard.writeText(data.question.texte)
+    setCopie(true)
+    setTimeout(() => setCopie(false), 2000)
+  }
+
+  if (isLoading) {
+    return <p className="p-6 text-texte-doux">{t('commun.chargement')}</p>
+  }
+
+  // Sans ce garde-fou, une coupure reseau laissait `data` vide : la
+  // destructuration plantait et l'ecran devenait BLANC, sans un mot, en plein
+  // match. Mieux vaut dire que ca a rate et offrir de reessayer.
+  if (!data) {
+    return (
+      <div className="p-6">
+        <p className="text-texte-doux">{t('commun.erreur')}</p>
+        <button onClick={() => refetch()}
+                className="mt-4 flex items-center gap-2 rounded-xl bg-neon text-fond font-semibold px-5 py-3 tape">
+          <RotateCcw size={16} />
+          {t('commun.reessayer')}
+        </button>
+        <Link to="/animation" className="mt-4 block text-sm text-texte-faible hover:text-neon">
+          {t('animation.retour_manches')}
+        </Link>
+      </div>
+    )
+  }
+
+  const { manche, question, equipes, classement } = data
+  const scores = Object.fromEntries(classement.map((c) => [c.equipe_id, c.points]))
+  const enCours = attribuer.isPending || annuler.isPending || transition
+
+  // Egalite parfaite : meme total ET meme rapidite. `enBarrage` = les equipes a
+  // departager tant que rien n'a tranche ; une fois tranchee, le vainqueur
+  // porte `departage`.
+  const enBarrage = classement.filter((c) => c.barrage_requis)
+  const vainqueurBarrage = classement.find((c) => c.departage)
+
+  // Les props du panneau, rassemblees une fois : il est rendu a deux endroits
+  // (manche en cours et classement final).
+  const propsBarrage = {
+    enBarrage,
+    vainqueur: vainqueurBarrage,
+    onTrancher: (id) => barrage.mutate(id),
+    onRetirer: () => barrage.mutate(null),
+    enAttente: barrage.isPending,
+  }
+
+  return (
+    <div className="min-h-screen pb-8">
+      <header className="flex items-center gap-3 px-4 py-3 border-b border-bord">
+        <Link to="/animation" className="text-texte-faible hover:text-texte" aria-label={t('commun.retour')}>
+          <ChevronLeft size={20} />
+        </Link>
+        <div className="min-w-0">
+          <p className="font-semibold truncate">{manche.libelle}</p>
+          <p className="text-xs text-texte-faible">
+            {t('animation.question')} {Math.min(manche.question_courante + 1, manche.nb_questions)}{' '}
+            {t('animation.sur')} {manche.nb_questions}
+          </p>
+        </div>
+      </header>
+
+      {/* Retour d'action : ce qui vient d'etre valide, visible le temps qu'il
+          faut pour en etre sur. */}
+      {flash && (
+        <div className="fixed inset-x-0 top-1/3 z-40 px-6 pointer-events-none">
+          <div className={cn('anim-eclat mx-auto max-w-sm rounded-2xl border px-5 py-4 text-center backdrop-blur',
+            flash.aucun
+              ? 'border-bord bg-surface/95'
+              : 'border-neon-sourd bg-surface/95 halo')}>
+            {flash.aucun ? (
+              <>
+                <MinusCircle size={22} className="mx-auto text-texte-faible" />
+                <p className="mt-2 text-sm text-texte-doux">{t('animation.aucun_point')}</p>
+              </>
+            ) : (
+              <>
+                <Trophy size={22} className="mx-auto text-neon" />
+                <p className="titre mt-2 text-xl font-bold truncate">{flash.libelle}</p>
+                <p className="text-sm text-neon">{t('animation.a_marque')}</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Manche close : l'ecran doit LE DIRE. Avant, cliquer sur « terminer »
+          ne changeait rien a l'affichage — on croyait que le bouton etait
+          casse alors que le statut avait bien bascule. */}
+      {manche.statut === 'terminee' ? (
+        <section className="px-4 pt-8 anim-monte">
+          <div className="carte p-6 text-center halo">
+            <Medal size={30} className="mx-auto text-or" />
+            <p className="etiquette mt-3 text-texte-faible">{t('animation.manche_terminee')}</p>
+            {classement[0] && (
+              <>
+                <p className="titre mt-2 text-2xl font-bold text-or truncate">{classement[0].libelle}</p>
+                <p className="text-sm text-texte-doux">
+                  {t('animation.vainqueur')} — {classement[0].points} pts
+                </p>
+              </>
+            )}
+          </div>
+
+          <p className="etiquette text-texte-faible mt-6 mb-2">{t('animation.classement_final')}</p>
+          <ol className="carte divide-y divide-bord cascade">
+            {classement.map((c) => (
+              <li key={c.equipe_id} className="flex items-center gap-3 px-4 py-3">
+                <span className={cn('w-6 text-center tabular-nums',
+                  c.rang === 1 ? 'text-or' : c.rang === 2 ? 'text-argent' : c.rang === 3 ? 'text-bronze' : 'text-texte-faible')}>
+                  {c.rang}
+                </span>
+                <span className="flex-1 min-w-0 flex items-center gap-2">
+                  <span className="truncate">{c.libelle}</span>
+                  <BadgeEgalite ligne={c} />
+                </span>
+                <span className={cn('font-bold tabular-nums', c.rang === 1 ? 'text-or' : 'text-texte-doux')}>
+                  {c.points}
+                </span>
+              </li>
+            ))}
+          </ol>
+
+          <PanneauBarrage {...propsBarrage} />
+
+          <p className="mt-4 text-xs text-texte-faible leading-relaxed">{t('animation.aide_terminee')}</p>
+
+          <div className="mt-4 flex gap-2">
+            <Link to="/animation"
+                  className="flex-1 rounded-xl bg-neon text-fond font-semibold py-3 text-center tape">
+              {t('animation.retour_manches')}
+            </Link>
+            <button onClick={() => rouvrir.mutate()} disabled={rouvrir.isPending}
+                    className="flex items-center gap-2 rounded-xl border border-bord px-4 text-texte-doux tape disabled:opacity-50">
+              <RotateCcw size={15} />
+              {t('animation.rouvrir')}
+            </button>
+          </div>
+        </section>
+      ) : question ? (
+        <section className={cn('px-4 pt-5', transition ? 'anim-sort-gauche' : 'anim-entre-droite')}
+                 key={manche.question_courante}>
+          {/* La question, et le bouton qui evite de la retaper dans Messenger.
+              C'est le geste qui fait gagner le plus de temps sur la soiree. */}
+          <div className="rounded-2xl bg-surface border border-bord p-4">
+            <p className="text-lg leading-snug">{question.texte}</p>
+
+            <button
+              type="button"
+              onClick={copierQuestion}
+              className={cn(
+                'mt-4 w-full flex items-center justify-center gap-2 rounded-xl py-3 font-semibold transition-colors',
+                copie ? 'bg-succes text-fond' : 'bg-neon text-fond halo',
+              )}
+            >
+              {copie ? <Check size={18} /> : <Copy size={18} />}
+              {copie ? t('animation.question_copiee') : t('animation.copier_question')}
+            </button>
+
+            <p className="mt-4 text-xs uppercase tracking-widest text-texte-faible">
+              {t('animation.reponse_attendue')}
+            </p>
+            <p className="text-neon-fort font-semibold">{question.reponse}</p>
+          </div>
+
+          <p className="mt-6 mb-2 text-sm text-texte-doux">{t('animation.qui_a_trouve')}</p>
+
+          {/* Cibles larges : on tape vite, a une main, sans regarder. */}
+          <div className="grid gap-2">
+            {equipes.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                disabled={enCours}
+                onClick={() => attribuer.mutate(e)}
+                className="flex items-center justify-between rounded-xl bg-surface-haute border border-bord px-4 py-4 text-left active:border-neon disabled:opacity-50"
+              >
+                <span className="font-medium">{e.libelle}</span>
+                <span className="text-neon font-bold tabular-nums">{scores[e.id] ?? 0}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Cas frequent : la question tombe a plat. Il ne doit pas quitter l'ecran. */}
+          <button
+            type="button"
+            disabled={enCours}
+            onClick={() => attribuer.mutate(null)}
+            className="mt-3 w-full rounded-xl border border-bord py-3 text-texte-doux disabled:opacity-50"
+          >
+            {t('animation.personne')}
+          </button>
+        </section>
+      ) : (
+        <p className="px-4 pt-8 text-texte-doux">{t('animation.aucune_question')}</p>
+      )}
+
+      <section className="px-4 pt-8">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={enCours}
+            onClick={() => annuler.mutate()}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-bord py-3 text-texte-doux disabled:opacity-50"
+          >
+            <Undo2 size={16} />
+            {t('animation.annuler_dernier')}
+          </button>
+          <button
+            type="button"
+            onClick={() => terminer.mutate()}
+            className="flex items-center justify-center gap-2 rounded-xl border border-bord px-4 text-texte-doux"
+          >
+            <Flag size={16} />
+            {t('animation.terminer')}
+          </button>
+        </div>
+
+        <PanneauBarrage {...propsBarrage} />
+
+        <p className="mt-8 mb-2 text-sm text-texte-doux">{t('animation.classement')}</p>
+        <ol className="rounded-2xl bg-surface border border-bord divide-y divide-bord">
+          {classement.map((c) => (
+            <li key={c.equipe_id} className="flex items-center gap-2 px-4 py-3">
+              <span className="w-6 text-texte-faible tabular-nums">{c.rang}</span>
+              <span className="flex-1 min-w-0 flex items-center gap-2">
+                <span className="truncate">{c.libelle}</span>
+                <BadgeEgalite ligne={c} />
+                {c.penalite < 0 && (
+                  <span className="shrink-0 text-[10px] text-danger" title={t('animation.penalite')}>{c.penalite}</span>
+                )}
+              </span>
+              {/* Retirer des points a l'equipe (avec motif). */}
+              <button onClick={() => penaliser(c)} disabled={penalite.isPending}
+                      title={t('animation.penalite')}
+                      className="shrink-0 text-texte-faible hover:text-danger transition-colors disabled:opacity-50">
+                <MinusCircle size={15} />
+              </button>
+              <span className={cn('font-bold tabular-nums w-8 text-right', c.rang === 1 ? 'text-neon' : 'text-texte-doux')}>
+                {c.points}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </div>
+  )
+}
+
+/**
+ * Barrage : la sortie de secours quand la rapidite ne departage plus.
+ *
+ * Defini au niveau module, PAS dans le corps de l'ecran : une fonction
+ * composant recreee a chaque rendu est un TYPE different pour React, qui
+ * demonte puis remonte le panneau — l'animation d'entree se rejouait donc a
+ * chaque rafraichissement (toutes les 15 s) en plein match.
+ */
+export function PanneauBarrage({ enBarrage, vainqueur, onTrancher, onRetirer, enAttente }) {
+  const { t } = useTranslation()
+
+  if (enBarrage.length < 2 && !vainqueur) return null
+
+  return (
+    <div className="mt-6 rounded-2xl border border-alerte/50 bg-alerte/10 p-4 anim-monte">
+      <div className="flex items-center gap-2">
+        <Scale size={16} className="text-alerte shrink-0" />
+        <p className="text-sm font-semibold text-alerte">{t('animation.egalite_parfaite')}</p>
+      </div>
+
+      {vainqueur ? (
+        <>
+          <p className="mt-2 text-sm text-texte-doux">
+            {t('animation.departage_applique', { equipe: vainqueur.libelle })}
+          </p>
+          <button onClick={onRetirer} disabled={enAttente}
+                  className="mt-3 flex items-center gap-2 text-sm text-texte-faible hover:text-danger transition-colors disabled:opacity-50">
+            <RotateCcw size={14} />
+            {t('animation.retirer_departage')}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="mt-1 text-xs text-texte-doux leading-relaxed">{t('animation.aide_barrage')}</p>
+          <p className="mt-3 text-sm text-texte-doux">{t('animation.designer_vainqueur')}</p>
+          <div className="mt-2 grid gap-2">
+            {enBarrage.map((c) => (
+              <button key={c.equipe_id} onClick={() => onTrancher(c.equipe_id)} disabled={enAttente}
+                      className="flex items-center justify-between rounded-xl bg-surface border border-bord px-4 py-3 text-left tape hover:border-neon disabled:opacity-50">
+                <span className="font-medium">{c.libelle}</span>
+                <span className="text-texte-faible tabular-nums">{c.points}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Marque une egalite au classement : « barrage » quand elle a ete tranchee a la
+ * main, « ex aequo » quand elle tient encore par la rapidite. Discret : c'est
+ * une information, pas une alarme.
+ */
+export function BadgeEgalite({ ligne }) {
+  const { t } = useTranslation()
+
+  if (ligne.departage) {
+    return (
+      <span className="shrink-0 rounded bg-alerte/15 text-alerte text-[10px] px-1.5 py-0.5">
+        {t('animation.badge_barrage')}
+      </span>
+    )
+  }
+  if (ligne.ex_aequo) {
+    return <span className="shrink-0 text-[10px] text-texte-faible italic">{t('animation.ex_aequo')}</span>
+  }
+  return null
+}

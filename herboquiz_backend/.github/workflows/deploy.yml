@@ -1,0 +1,87 @@
+name: Deploy HerboQuiz Backend
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - ".gitignore"
+  workflow_dispatch:
+
+# Deux deploiements simultanes se marcheraient dessus pendant les migrations.
+concurrency:
+  group: deploy-herboquiz-backend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, mbstring, bcmath
+          coverage: none
+
+      - name: Installer les dependances
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: Cle SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 10 -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      # storage/ et bootstrap/cache/ portent l'etat d'execution : journaux,
+      # cache, sessions. PHP y ecrit sous l'identite www-data, que le compte de
+      # deploiement ne peut pas supprimer — d'ou l'echec de --delete. Et meme
+      # sans probleme de droits, les synchroniser effacerait des donnees vivantes
+      # a chaque deploiement. On les laisse donc entierement au serveur.
+      - name: Envoyer le code
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
+            --exclude '.git' --exclude '.github' --exclude 'tests' --exclude '.env' \
+            --exclude 'storage' --exclude 'bootstrap/cache' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      - name: Migrer et vider les caches
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} bash <<'DISTANT'
+          set -e
+          cd ${{ secrets.DEPLOY_PATH }}
+
+          # Garde-fou volontaire : le .env de production n'est jamais versionne.
+          # S'il manque, mieux vaut echouer bruyamment que servir une app cassee.
+          if [ ! -f .env ]; then
+            echo "ERREUR : .env absent sur le serveur, deploiement interrompu"
+            exit 1
+          fi
+
+          php artisan migrate --force --no-interaction
+          # Pose les reglages manquants (nouveaux textes, nouveaux messages...).
+          # Idempotent par conception : n'insere que les cles absentes, n'ecrase
+          # JAMAIS une valeur deja modifiee par un administrateur.
+          php artisan db:seed --class=ReglagesSeeder --force --no-interaction
+          php artisan config:clear
+          php artisan route:clear
+          # storage/ et bootstrap/cache/ sont EXCLUS du rsync (donnees vivantes
+          # ecrites par www-data). Un chmod dessus depuis le compte de deploiement
+          # echoue forcement (« Operation not permitted » sur les fichiers www-data)
+          # et, avec set -e, faisait planter l'etape ALORS QUE le deploiement etait
+          # deja fait. Non-fatal et silencieux : on tente sans jamais casser le build.
+          chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+          DISTANT
+
+      - name: Verifier que l'API repond
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://herboquiz.novafriq.africa/api/public)
+          echo "API -> $code"
+          [ "$code" = "200" ] || exit 1

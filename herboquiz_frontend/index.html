@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0F1720" />
+    <meta name="description" content="Tournoi de quiz de la TEAM DES HERBOGENISTES : classement en direct, calendrier et reglement." />
+
+    <!-- Apercu de partage (WhatsApp, Facebook, Messenger...). Quand le lien est
+         colle dans un groupe, c'est cette carte qui s'affiche : titre, image et
+         « Propulse par NovafriQ ». La marque voyage donc avec chaque partage. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="HerboQuiz — propulse par NovafriQ" />
+    <meta property="og:title" content="HerboQuiz — Tournoi de quiz" />
+    <meta property="og:description" content="Classement en direct, poules et calendrier du tournoi. Propulse par NovafriQ." />
+    <meta property="og:url" content="https://herboquiz.novafriq.africa/" />
+    <meta property="og:image" content="https://herboquiz.novafriq.africa/partage.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="HerboQuiz — Tournoi de quiz" />
+    <meta name="twitter:description" content="Classement en direct, poules et calendrier. Propulse par NovafriQ." />
+    <meta name="twitter:image" content="https://herboquiz.novafriq.africa/partage.png" />
+
+    <!-- Donnees structurees (JSON-LD). Invisibles a l'ecran : elles decrivent
+         l'evenement aux moteurs de recherche (rich results possibles) et
+         rattachent le site a NovafriQ (creator) de facon machine-lisible.
+         100% arriere-plan, aucun impact sur l'affichage. -->
+    <script type="application/ld+json">
+    [
+      {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "name": "HERBOGENISTES TOURNAMENT 2EME EDITION",
+        "description": "Tournoi de quiz de la TEAM DES HERBOGENISTES : classement en direct, poules et calendrier.",
+        "startDate": "2026-07-27T18:00:00+01:00",
+        "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "location": { "@type": "VirtualLocation", "url": "https://herboquiz.novafriq.africa/" },
+        "organizer": { "@type": "Organization", "name": "TEAM DES HERBOGENISTES" },
+        "image": "https://herboquiz.novafriq.africa/partage.png",
+        "url": "https://herboquiz.novafriq.africa/"
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "HerboQuiz",
+        "url": "https://herboquiz.novafriq.africa/",
+        "creator": { "@type": "Organization", "name": "NovafriQ", "url": "https://novafriq.africa" }
+      }
+    ]
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap" rel="stylesheet" />
+    <title>HerboQuiz</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

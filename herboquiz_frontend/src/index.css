@@ -1,0 +1,728 @@
+@import "tailwindcss";
+
+/*
+ * Système de couleurs avec thème clair/sombre inspiré d'AGORA
+ * Le thème s'adapte automatiquement à la préférence système,
+ * ou peut être changé manuellement via le bouton toggle
+ */
+@theme {
+  /* Couleurs de base - Thème sombre par défaut */
+  --color-ink: #12151b;
+  --color-ink-raised: #1b1f27;
+  --color-paper: #f6f1e3;
+  --color-paper-dim: #eae3d0;
+  --color-ember: #ff4b2e;
+  --color-ember-dim: #c93a22;
+  --color-gold-base: #e8a93c;
+  --color-signal: #4fe3b0;
+  --color-muted: #9a9486;
+  
+  /* Couleurs sémantiques - Thème sombre */
+  --color-neon: #22D3FF;
+  --color-neon-fort: #7DE7FF;
+  --color-neon-sourd: #0E7490;
+
+  --color-fond: var(--color-ink);
+  --color-fond-2: var(--color-ink-raised);
+  --color-surface: rgba(246,241,227,0.05);
+  --color-surface-haute: rgba(246,241,227,0.09);
+  --color-bord: rgba(246,241,227,0.14);
+  --color-bord-vif: #2C4059;
+
+  --color-texte: var(--color-paper);
+  --color-texte-doux: #c9c3b4;
+  --color-texte-faible: var(--color-muted);
+
+  --color-or: var(--color-gold-base);
+  --color-argent: #C6D3DF;
+  --color-bronze: #CD8B4E;
+
+  --color-succes: #34D399;
+  --color-alerte: #FBBF24;
+  --color-danger: #F87171;
+
+  --font-titre: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Thème clair - activé via [data-theme="light"] */
+:root[data-theme="light"] {
+  --color-fond: #faf6ea;
+  --color-fond-2: #f1ead6;
+  --color-surface: rgba(18,21,27,0.04);
+  --color-surface-haute: rgba(18,21,27,0.07);
+  --color-bord: rgba(18,21,27,0.12);
+  --color-bord-vif: rgba(18,21,27,0.2);
+  
+  --color-texte: #181510;
+  --color-texte-doux: #5a5346;
+  --color-texte-faible: #7a7263;
+  
+  --color-ember: #d43f22;
+  --color-ember-dim: #a83019;
+  --color-gold-base: #a06a1a;
+  --color-signal: #1f9b73;
+  
+  --color-or: #a06a1a;
+  --color-neon: #0E7490;
+  --color-neon-fort: #0c6582;
+  --color-neon-sourd: #22D3FF;
+}
+
+/* Support de la préférence système */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-fond: #faf6ea;
+    --color-fond-2: #f1ead6;
+    --color-surface: rgba(18,21,27,0.04);
+    --color-surface-haute: rgba(18,21,27,0.07);
+    --color-bord: rgba(18,21,27,0.12);
+    --color-bord-vif: rgba(18,21,27,0.2);
+    
+    --color-texte: #181510;
+    --color-texte-doux: #5a5346;
+    --color-texte-faible: #7a7263;
+    
+    --color-ember: #d43f22;
+    --color-ember-dim: #a83019;
+    --color-gold-base: #a06a1a;
+    --color-signal: #1f9b73;
+    
+    --color-or: #a06a1a;
+    --color-neon: #0E7490;
+    --color-neon-fort: #0c6582;
+    --color-neon-sourd: #22D3FF;
+  }
+}
+
+html, body, #root { min-height: 100%; }
+
+body {
+  background-color: var(--color-fond);
+  color: var(--color-texte);
+  -webkit-tap-highlight-color: transparent;
+  transition: background .3s ease, color .3s ease;
+  /* Voile lumineux tres discret : donne de la profondeur sans coûter une image. */
+  background-image:
+    radial-gradient(60rem 30rem at 50% -10%, #22D3FF14, transparent 70%),
+    radial-gradient(40rem 20rem at 90% 10%, #0E749018, transparent 70%);
+  background-attachment: fixed;
+}
+
+/* Titres en condense, comme la plupart des interfaces de competition. */
+.titre { font-family: var(--font-titre); letter-spacing: .01em; }
+.etiquette { font-size: .68rem; letter-spacing: .18em; text-transform: uppercase; }
+
+.halo { box-shadow: 0 0 0 1px #0E7490, 0 0 24px -6px #22D3FF; }
+.halo-or { box-shadow: 0 0 0 1px #F5C54255, 0 0 24px -8px #F5C542; }
+
+.carte {
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-haute) 100%);
+  border: 1px solid var(--color-bord);
+  border-radius: 1rem;
+  transition: background .3s ease, border-color .3s ease;
+}
+
+/* Bouton de toggle de thème */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--color-bord);
+  background: var(--color-surface);
+  font-size: 18px;
+  transition: all .25s ease;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--color-surface-haute);
+  border-color: var(--color-neon);
+  transform: rotate(180deg);
+}
+
+/* --- Animations : discretes, et coupees si l'utilisateur les refuse --- */
+@keyframes monte { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+@keyframes pulse-neon { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+@keyframes glisse { from { opacity: 0; transform: translateX(-8px) } to { opacity: 1; transform: none } }
+
+.anim-monte  { animation: monte .35s ease both; }
+.anim-glisse { animation: glisse .3s ease both; }
+.anim-pulse  { animation: pulse-neon 1.8s ease-in-out infinite; }
+
+/* Cascade : chaque ligne d'un classement entre juste apres la precedente. */
+.cascade > * { animation: monte .3s ease both; }
+.cascade > *:nth-child(1) { animation-delay: .02s }
+.cascade > *:nth-child(2) { animation-delay: .06s }
+.cascade > *:nth-child(3) { animation-delay: .10s }
+.cascade > *:nth-child(4) { animation-delay: .14s }
+.cascade > *:nth-child(5) { animation-delay: .18s }
+.cascade > *:nth-child(n+6) { animation-delay: .22s }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-monte, .anim-glisse, .anim-pulse, .cascade > * { animation: none !important; }
+}
+
+/* Retour tactile : l'animateur doit sentir que son appui a ete pris. */
+.tape { transition: transform .08s ease, border-color .15s ease; }
+.tape:active { transform: scale(.985); }
+
+/* --- Animations pour la section Prix (inspirées de animat) --- */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes rw-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 7s linear infinite;
+}
+
+@keyframes ray {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.28; }
+}
+
+.animate-ray {
+  animation: ray 8s ease-in-out infinite;
+}
+
+/* --- Retour d'action de l'animateur ---
+   Sans elles, l'ecran passait a la question suivante sans qu'on ait vu ce
+   qui venait d'etre valide : on tapait dans le vide. Le point marque
+   s'affiche un instant, puis la question suivante entre par la droite. */
+@keyframes eclat {
+  0%   { opacity: 0; transform: scale(.9) }
+  15%  { opacity: 1; transform: scale(1.02) }
+  85%  { opacity: 1; transform: scale(1) }
+  100% { opacity: 0; transform: scale(.98) }
+}
+@keyframes entre-droite {
+  from { opacity: 0; transform: translateX(24px) }
+  to   { opacity: 1; transform: none }
+}
+@keyframes sort-gauche {
+  from { opacity: 1; transform: none }
+  to   { opacity: 0; transform: translateX(-24px) }
+}
+
+.anim-eclat        { animation: eclat 1.3s ease both; }
+.anim-entre-droite { animation: entre-droite .28s ease both; }
+.anim-sort-gauche  { animation: sort-gauche .2s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-eclat, .anim-entre-droite, .anim-sort-gauche { animation: none !important; }
+}
+
+/* --- Styles supplémentaires pour la page publique refondée --- */
+
+/* Navigation sticky avec blur */
+nav.backdrop-blur-sm {
+  backdrop-filter: blur(12px);
+}
+
+/* Effet de hover sur les cartes de catégories */
+.groupe:hover {
+  transform: translateY(-4px);
+}
+
+/* Gradient backgrounds */
+.bg-gradient-to-r {
+  background-image: linear-gradient(to right, var(--tw-gradient-stops));
+}
+
+.bg-gradient-to-b {
+  background-image: linear-gradient(to bottom, var(--tw-gradient-stops));
+}
+
+.bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+}
+
+/* Effet prose pour le contenu riche */
+.prose {
+  max-width: 65ch;
+}
+
+.prose-invert {
+  color: var(--color-texte-doux);
+}
+
+.prose-invert h1,
+.prose-invert h2,
+.prose-invert h3 {
+  color: var(--color-neon);
+  font-family: var(--font-titre);
+  font-weight: 700;
+}
+
+.prose-invert a {
+  color: var(--color-neon);
+  text-decoration: underline;
+}
+
+.prose-invert a:hover {
+  color: var(--color-neon-fort);
+}
+
+.prose-invert p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+.prose-invert ul,
+.prose-invert ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.prose-invert li {
+  margin-bottom: 0.5rem;
+}
+
+/* Amélioration du podium */
+@keyframes podium-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.carte.hover\:border-or:hover {
+  border-color: var(--color-or);
+}
+
+.carte.hover\:border-argent\/50:hover {
+  border-color: rgba(198, 211, 223, 0.5);
+}
+
+.carte.hover\:border-bronze\/50:hover {
+  border-color: rgba(205, 139, 78, 0.5);
+}
+
+/* Smooth scroll pour les ancres */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Amélioration de l'accessibilité du focus */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-neon);
+  outline-offset: 2px;
+}
+
+/* Responsive global - Amélioration des textes et espacements */
+@media (max-width: 768px) {
+  /* Hero responsive */
+  .hero-copy h1 {
+    font-size: clamp(2rem, 8vw, 2.6rem);
+  }
+  
+  .hero-copy p {
+    font-size: 1rem;
+  }
+  
+  .hero-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .hero-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* Sections */
+  section {
+    padding-block: clamp(48px, 8vw, 80px);
+  }
+  
+  /* Titres de sections */
+  .text-4xl {
+    font-size: 2rem;
+  }
+  
+  .text-5xl {
+    font-size: 2.5rem;
+  }
+  
+  /* Stats ticker */
+  .ticker .num {
+    font-size: 1.1rem;
+  }
+  
+  .ticker .lbl {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Hero encore plus petit */
+  .hero-copy h1 {
+    font-size: clamp(1.75rem, 9vw, 2rem);
+  }
+  
+  .eyebrow {
+    font-size: 0.65rem;
+  }
+  
+  /* Boutons plus compacts */
+  .btn {
+    padding: 0.8em 1.4em;
+    font-size: 0.9rem;
+  }
+  
+  /* Cartes */
+  .carte {
+    padding: 1rem;
+  }
+  
+  /* Podium */
+  .text-5xl {
+    font-size: 2rem;
+  }
+  
+  .text-3xl {
+    font-size: 1.5rem;
+  }
+}
+
+/* Tables responsive */
+@media (max-width: 640px) {
+  table {
+    font-size: 0.875rem;
+  }
+  
+  th, td {
+    padding: 0.5rem !important;
+  }
+}
+
+/* Prose responsive dans règlement */
+.prose {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+}
+
+.prose table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .prose {
+    font-size: 0.875rem;
+  }
+  
+  .prose h1 {
+    font-size: 1.5rem;
+  }
+  
+  .prose h2 {
+    font-size: 1.25rem;
+  }
+  
+  .prose h3 {
+    font-size: 1.1rem;
+  }
+}
+
+/* Stats qui ressortent */
+.text-clip-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Animation douce pour les transitions */
+* {
+  transition-property: color, background-color, border-color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Désactiver les transitions sur les éléments qui se déplacent */
+.carte,
+.groupe,
+.tape {
+  transition-property: transform, border-color, box-shadow;
+}
+
+/* Mobile menu hamburger animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Animation pour le slider de règlement */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out-left {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* Responsive improvements */
+@media (max-width: 640px) {
+  .titre {
+    letter-spacing: 0;
+  }
+  
+  .carte {
+    border-radius: 0.75rem;
+  }
+}
+
+/* --- Styles spécifiques du hero AGORA --- */
+.hero {
+  position: relative;
+}
+
+.hero-grid {
+  display: grid;
+  gap: 56px;
+}
+
+@media (min-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: center;
+  }
+}
+
+.hero-copy h1 {
+  margin-block: 0.5em 0.55em;
+  line-height: 0.98;
+}
+
+.hero-copy p {
+  max-width: 44ch;
+  font-size: 1.08rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 2.1rem;
+}
+
+/* Ticker stats */
+.ticker {
+  margin-top: 3.2rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--color-bord);
+  border: 1px solid var(--color-bord);
+  max-width: 520px;
+}
+
+@media (min-width: 520px) {
+  .ticker {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.ticker div {
+  background: var(--color-fond);
+  padding: 14px 12px;
+}
+
+.ticker .num {
+  font-family: 'Rajdhani', ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texte);
+}
+
+.ticker .lbl {
+  display: block;
+  margin-top: 0.3em;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Card fan - cartes de questions */
+.card-fan {
+  position: relative;
+  height: clamp(320px, 40vw, 440px);
+}
+
+.qcard {
+  position: absolute;
+  width: min(72%, 268px);
+  height: 172px;
+  padding: 20px;
+  background: var(--color-fond-2);
+  border: 1px solid var(--color-bord);
+  border-radius: 2px;
+  box-shadow: 0 30px 60px -25px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+:root[data-theme="light"] .qcard {
+  box-shadow: 0 30px 60px -30px rgba(30, 20, 10, 0.25);
+}
+
+.qcard .code {
+  font-family: 'Rajdhani', ui-monospace, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+
+.qcard h3 {
+  font-size: 1.05rem;
+  line-height: 1.25;
+  margin-top: 0.5rem;
+  font-weight: 900;
+}
+
+.qcard .pts {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  font-family: 'Rajdhani', ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--color-or);
+}
+
+/* Eyebrow badge */
+.eyebrow {
+  font-family: 'Rajdhani', ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-or);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--color-ember);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255, 75, 46, 0.22);
+}
+
+/* Boutons AGORA */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.95em 1.7em;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), 
+              box-shadow 0.25s ease, 
+              background 0.25s ease, 
+              color 0.25s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--color-ember);
+  color: #191008;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -12px rgba(255, 75, 46, 0.55);
+}
+
+.btn-ghost {
+  border: 1px solid var(--color-bord);
+  color: var(--color-texte);
+}
+
+.btn-ghost:hover {
+  background: var(--color-surface);
+  border-color: var(--color-texte-doux);
+}
+
+/* Couleurs ember et muted */
+.text-ember {
+  color: var(--color-ember);
+}
+
+.text-muted {
+  color: var(--color-muted);
+}
+
+.bg-ember {
+  background-color: var(--color-ember);
+}

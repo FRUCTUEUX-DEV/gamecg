@@ -1,0 +1,410 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Reglage;
+use Illuminate\Database\Seeder;
+
+/**
+ * Catalogue de TOUT ce qui doit rester modifiable depuis l'administration.
+ *
+ * Regle de fond du projet : aucun texte, aucun prix, aucun seuil ne vit dans le
+ * code. Si une valeur doit un jour changer sans redeploiement, sa place est
+ * ici. Le seeder ne fait que POSER les valeurs de depart : il n'ecrase jamais
+ * une valeur deja modifiee par un administrateur (updateOrCreate sur la cle,
+ * mais la valeur n'est ecrite qu'a la creation).
+ */
+class ReglagesSeeder extends Seeder
+{
+    public function run(): void
+    {
+        foreach ($this->catalogue() as $ordre => $r) {
+            $existe = Reglage::where('cle', $r['cle'])->first();
+
+            if ($existe) {
+                // On rafraichit le libelle et l'aide (ils peuvent s'ameliorer),
+                // mais JAMAIS la valeur : elle appartient a l'administrateur.
+                $existe->update([
+                    'libelle' => $r['libelle'],
+                    'aide'    => $r['aide']   ?? null,
+                    'groupe'  => $r['groupe'],
+                    'type'    => $r['type'],
+                    'ordre'   => $ordre,
+                ]);
+
+                continue;
+            }
+
+            Reglage::create($r + ['ordre' => $ordre]);
+        }
+    }
+
+    private function catalogue(): array
+    {
+        return [
+            // ---------- Identite de l'evenement ----------
+            [
+                'cle' => 'tournoi.nom', 'groupe' => 'general', 'type' => 'texte',
+                'libelle' => 'Nom du tournoi',
+                'valeur'  => 'Tournoi TEAM DES HERBOGENISTES 2026',
+            ],
+            [
+                'cle' => 'tournoi.organisateur', 'groupe' => 'general', 'type' => 'texte',
+                'libelle' => 'Organisateur',
+                'valeur'  => 'TEAM DES HERBOGENISTES',
+            ],
+            [
+                'cle' => 'tournoi.debut', 'groupe' => 'general', 'type' => 'texte',
+                'libelle' => 'Date et heure du coup d\'envoi',
+                'aide'    => 'Affiche tel quel sur la page publique. Heure du Benin.',
+                'valeur'  => 'Lundi 27 juillet 2026 à 18h00',
+            ],
+            [
+                'cle' => 'tournoi.canal_poules', 'groupe' => 'general', 'type' => 'texte',
+                'libelle' => 'Canal des matchs de poules',
+                'valeur'  => 'Groupe Messenger',
+            ],
+            [
+                'cle' => 'tournoi.canal_finales', 'groupe' => 'general', 'type' => 'texte',
+                'libelle' => 'Canal des phases finales',
+                'valeur'  => 'Groupe WhatsApp',
+            ],
+
+            // ---------- Inscriptions ----------
+            [
+                'cle' => 'inscriptions.ouvertes', 'groupe' => 'inscriptions', 'type' => 'booleen',
+                'libelle' => 'Inscriptions ouvertes',
+                'aide'    => 'Une fois ferme, la page publique affiche la liste definitive.',
+                'valeur'  => '1',
+            ],
+            [
+                'cle' => 'inscriptions.comment', 'groupe' => 'inscriptions', 'type' => 'markdown',
+                'libelle' => 'Comment s\'inscrire',
+                'aide'    => 'Le point le plus important de l\'annonce : sans methode claire, personne ne s\'inscrit.',
+                'valeur'  => "Envoyez votre nom et prenom dans le groupe, ou par message prive a un administrateur.",
+            ],
+            [
+                'cle' => 'inscriptions.date_limite', 'groupe' => 'inscriptions', 'type' => 'texte',
+                'libelle' => 'Date limite d\'inscription (texte affiche)',
+                'aide'    => 'Affiche tel quel sur la page publique. Sans date de cloture, impossible de figer le format ni de composer les poules.',
+                'valeur'  => 'Samedi 25 juillet 2026 à 20h00',
+            ],
+            [
+                'cle' => 'inscriptions.ferme_le', 'groupe' => 'inscriptions', 'type' => 'texte',
+                'libelle' => 'Fermeture automatique (date et heure)',
+                'aide'    => 'Format AAAA-MM-JJ HH:MM, heure du Benin. A cette heure PILE, les inscriptions se ferment seules : le formulaire disparait et « inscrire » refuse. Laisser vide pour desactiver la fermeture auto (seul l\'interrupteur compte alors).',
+                'valeur'  => '2026-07-25 20:00',
+            ],
+
+            // ---------- Prix ----------
+            [
+                'cle' => 'prix.premier', 'groupe' => 'prix', 'type' => 'nombre',
+                'libelle' => 'Prix du 1er (FCFA)', 'valeur' => '10000',
+            ],
+            [
+                'cle' => 'prix.deuxieme', 'groupe' => 'prix', 'type' => 'nombre',
+                'libelle' => 'Prix du 2e (FCFA)', 'valeur' => '5000',
+            ],
+            [
+                'cle' => 'prix.troisieme', 'groupe' => 'prix', 'type' => 'nombre',
+                'libelle' => 'Prix du 3e (FCFA)',
+                'aide'    => 'Suppose un match pour la 3e place entre les deux perdants des demi-finales.',
+                'valeur'  => '2000',
+            ],
+            [
+                'cle' => 'prix.meilleur_marqueur', 'groupe' => 'prix', 'type' => 'nombre',
+                'libelle' => 'Prix du meilleur marqueur (FCFA)',
+                'aide'    => 'Calcule sur les poules seulement : sur le total general, ce serait presque toujours le vainqueur.',
+                'valeur'  => '2000',
+            ],
+            [
+                'cle' => 'prix.animateurs', 'groupe' => 'prix', 'type' => 'nombre',
+                'libelle' => 'Enveloppe des animateurs (FCFA)', 'valeur' => '8000',
+            ],
+            [
+                'cle' => 'prix.devise', 'groupe' => 'prix', 'type' => 'texte',
+                'libelle' => 'Devise affichee', 'valeur' => 'FCFA',
+            ],
+            [
+                'cle' => 'prix.versement', 'groupe' => 'prix', 'type' => 'markdown',
+                'libelle' => 'Modalites de versement',
+                'valeur'  => "Les prix sont verses par Mobile Money dans les jours qui suivent la finale.",
+            ],
+
+            // ---------- Textes publics ----------
+            [
+                'cle' => 'textes.annonce', 'groupe' => 'annonce', 'type' => 'markdown',
+                'libelle' => 'Annonce officielle',
+                'aide'    => 'Texte principal de la page d\'accueil.',
+                'valeur'  => "Le moment tant attendu est arrive : le tournoi de la TEAM DES HERBOGENISTES ouvre ses portes.\n\nLes matchs de poules se jouent dans le groupe Messenger, les phases finales sur WhatsApp. Que chacun vienne defendre ses connaissances dans le respect du fair-play.",
+            ],
+            [
+                'cle' => 'textes.reglement', 'groupe' => 'reglement', 'type' => 'markdown',
+                'libelle' => 'Reglement du tournoi',
+                'aide'    => 'Reste court : un reglement long n\'est pas lu. N\'y mettez que des regles applicables.',
+                'valeur'  => "1. L'animateur pose la question, puis annonce STOP. Toute reponse posterieure est nulle.\n2. La premiere bonne reponse marque le point. Recopier une reponse deja donnee ne rapporte rien.\n3. La rapidite fait partie du jeu.\n4. L'orthographe approximative est acceptee tant que la reponse est reconnaissable.\n5. Une seule participation par personne.\n6. En cas de litige, la decision de l'animateur est definitive.\n7. Une absence a une manche ne donne pas droit a un rattrapage.",
+            ],
+            [
+                'cle' => 'textes.pied_page', 'groupe' => 'annonce', 'type' => 'texte',
+                'libelle' => 'Mention de pied de page',
+                'valeur'  => 'Le savoir est notre force, l\'excellence est notre objectif.',
+            ],
+
+            // ---------- Page « A propos » ----------
+            // Contenu editorial de la page /a-propos, decoupe par section (et
+            // non un seul bloc de texte) : chaque champ alimente un bloc de
+            // mise en page distinct, pour une page structuree plutot qu'un mur
+            // de texte. Comme le reste, rien n'est fige dans le code.
+            [
+                'cle' => 'apropos.titre', 'groupe' => 'apropos', 'type' => 'texte',
+                'libelle' => 'Titre de la page « À propos »',
+                'valeur'  => 'À propos du tournoi',
+            ],
+            [
+                'cle' => 'apropos.accroche', 'groupe' => 'apropos', 'type' => 'texte',
+                'libelle' => 'Accroche',
+                'aide'    => 'Phrase mise en avant en haut de la page « À propos ».',
+                'valeur'  => 'Le moment tant attendu est arrivé : le tournoi de la TEAM DES HERBOGENISTES ouvre ses portes.',
+            ],
+            [
+                'cle' => 'apropos.intro', 'groupe' => 'apropos', 'type' => 'markdown',
+                'libelle' => 'Texte d\'introduction',
+                'aide'    => 'Un ou deux paragraphes, juste sous l\'accroche.',
+                'valeur'  => "Avis à tous les puits de science, aux rois du buzz et à ceux qui répondent toujours devant leur télé : bloquez vos agendas, l'heure de vérité a sonné.\n\n"
+                    . "Le tournoi ultime s'annonce. On va enfin savoir qui a un vrai cerveau encyclopédique et qui fait juste semblant d'avoir de la culture générale en insultant les candidats devant sa télé. Préparez-vous, les méninges vont chauffer !",
+            ],
+            [
+                'cle' => 'apropos.phase_poules', 'groupe' => 'apropos', 'type' => 'markdown',
+                'libelle' => 'Le terrain de jeu — phase de poules',
+                'aide'    => 'Le canal (Messenger/WhatsApp) est repris depuis les réglages « Général ».',
+                'valeur'  => "Bienvenue dans la foire d'empoigne. Ça va spammer de réponses à toute vitesse, râler sur la vitesse de connexion et balancer des gifs de panique quand la question piège va tomber. Un vrai parcours du combattant pour vos pouces.",
+            ],
+            [
+                'cle' => 'apropos.phase_finales', 'groupe' => 'apropos', 'type' => 'markdown',
+                'libelle' => 'Le terrain de jeu — phases finales',
+                'valeur'  => "Là, fini de rigoler, on passe dans la cour des grands. La tension monte d'un cran, le correcteur automatique va tenter de vous saboter au pire moment, et le stress du « En train d'écrire... » de votre adversaire va vous donner des sueurs froides.",
+            ],
+            [
+                'cle' => 'apropos.regles', 'groupe' => 'apropos', 'type' => 'markdown',
+                'libelle' => 'Les règles de la maison',
+                'aide'    => 'Une règle par ligne, au format « - **Titre :** description ». Chaque ligne devient une carte sur la page.',
+                'valeur'  => "- **Fair-play avant tout :** On reste polis et respectueux, même si votre voisin de poule sèche sur une question niveau CP. Pas de tacles gratuits, on est là pour s'amuser.\n"
+                    . "- **Jeu propre :** On oublie Google, Wikipédia, l'IA (on sait comment on est tous experts avec ça, nous y compris) ou le pote calé à côté de soi. On joue avec son propre cerveau, garanti sans triche. De grâce, les enregistrements automatiques ne vous aideront pas.\n"
+                    . "- **Mauvaise foi tolérée :** Si vous vous plantez, vous avez le droit de rejeter la faute sur un bug de réseau, une question mal posée ou une tante éloignée qui a envoûté le clavier. Ça passe.",
+            ],
+            [
+                'cle' => 'apropos.cloture', 'groupe' => 'apropos', 'type' => 'texte',
+                'libelle' => 'Phrase de clôture',
+                'aide'    => 'Dernière ligne, mise en avant avant l\'appel à l\'action.',
+                'valeur'  => "Révisez vos classiques, chauffez vos doigts pour taper plus vite que l'éclair et venez défendre votre honneur. Que le ou la plus grand(e) génie l'emporte.",
+            ],
+
+            // ---------- Signature discrete ----------
+            [
+                'cle' => 'signature.texte', 'groupe' => 'signature', 'type' => 'texte',
+                'libelle' => 'Mention en pied de page',
+                'aide'    => 'Reste discrete a dessein : le tournoi appartient au groupe, pas a son hebergeur.',
+                'valeur'  => 'Propulse par NovafriQ',
+            ],
+            [
+                'cle' => 'signature.lien', 'groupe' => 'signature', 'type' => 'texte',
+                'libelle' => 'Lien de la mention',
+                'valeur'  => 'https://novafriq.africa',
+            ],
+            [
+                'cle' => 'signature.active', 'groupe' => 'signature', 'type' => 'booleen',
+                'libelle' => 'Afficher la mention', 'valeur' => '1',
+            ],
+
+            // ---------- Courriel de confirmation ----------
+            [
+                'cle' => 'email.actif', 'groupe' => 'email', 'type' => 'booleen',
+                'libelle' => 'Envoyer un courriel de confirmation',
+                'aide'    => 'A l\'inscription. Si l\'envoi echoue, l\'inscription reste enregistree.',
+                'valeur'  => '1',
+            ],
+            [
+                'cle' => 'email.inscription_sujet', 'groupe' => 'email', 'type' => 'texte',
+                'libelle' => 'Objet du courriel',
+                'valeur'  => 'Votre inscription au tournoi est enregistree',
+            ],
+            [
+                'cle' => 'email.inscription_corps', 'groupe' => 'email', 'type' => 'markdown',
+                'libelle' => 'Corps du courriel',
+                'aide'    => 'Une ligne vide separe deux paragraphes.',
+                'valeur'  => "Votre inscription au tournoi est bien prise en compte.\n\nLes matchs de poules se jouent dans le groupe Messenger, les phases finales sur WhatsApp. Restez attentif au groupe : le format et le calendrier y seront annonces des la cloture des inscriptions.\n\nA bientot, et que le meilleur gagne.",
+            ],
+            [
+                'cle' => 'tournoi.url', 'groupe' => 'general', 'type' => 'texte',
+                'libelle' => 'Adresse du site',
+                'valeur'  => 'https://herboquiz.novafriq.africa',
+            ],
+
+            // ---------- Regles de jeu (parametres, jamais des constantes) ----------
+            [
+                'cle' => 'jeu.points_bonne_reponse', 'groupe' => 'jeu', 'type' => 'nombre',
+                'libelle' => 'Points par bonne reponse',
+                'aide'    => 'Habitude du groupe : 10 points. Les seuils de duel s\'expriment en bonnes reponses, ils suivent donc automatiquement.',
+                'valeur'  => '10',
+            ],
+            [
+                'cle' => 'jeu.score_cible_duel', 'groupe' => 'jeu', 'type' => 'nombre',
+                'libelle' => 'Bonnes reponses pour gagner un duel',
+                'aide'    => 'Exprime en BONNES REPONSES, pas en points : changer la valeur d\'une bonne reponse ne dereglera pas les duels.',
+                'valeur'  => '5',
+            ],
+            [
+                'cle' => 'jeu.score_cible_finale', 'groupe' => 'jeu', 'type' => 'nombre',
+                'libelle' => 'Bonnes reponses pour gagner la finale',
+                'aide'    => 'Plus eleve que les autres duels : cela donne du poids au titre.',
+                'valeur'  => '7',
+            ],
+
+            [
+                'cle' => 'jeu.jours_entre_tours', 'groupe' => 'jeu', 'type' => 'nombre',
+                'libelle' => 'Jours entre deux tours',
+                'aide'    => 'Sert a proposer les dates des tours suivants. Chaque date reste modifiable.',
+                'valeur'  => '1',
+            ],
+            [
+                'cle' => 'jeu.heure_manche', 'groupe' => 'jeu', 'type' => 'texte',
+                'libelle' => 'Heure habituelle des manches',
+                'aide'    => 'Format 24h, par exemple 18:00. Heure du Benin.',
+                'valeur'  => '18:00',
+            ],
+
+            // ---------- Seuils de la simulation ----------
+            [
+                'cle' => 'simulation.max_par_poule', 'groupe' => 'simulation', 'type' => 'nombre',
+                'libelle' => 'Joueurs maximum par poule',
+                'aide'    => 'Au-dela, les reponses defilent trop vite dans le groupe pour que l\'animateur suive.',
+                'valeur'  => '20',
+            ],
+            [
+                'cle' => 'simulation.qualifies_par_poule', 'groupe' => 'simulation', 'type' => 'nombre',
+                'libelle' => 'Qualifies par poule', 'valeur' => '4',
+            ],
+            [
+                'cle' => 'simulation.questions_par_joueur', 'groupe' => 'simulation', 'type' => 'nombre',
+                'libelle' => 'Questions par joueur',
+                'aide'    => 'Sert a proposer le nombre de questions d\'une manche de poule.',
+                'valeur'  => '1',
+            ],
+            [
+                'cle' => 'simulation.questions_min', 'groupe' => 'simulation', 'type' => 'nombre',
+                'libelle' => 'Questions minimum par manche', 'valeur' => '12',
+            ],
+            [
+                'cle' => 'simulation.questions_max', 'groupe' => 'simulation', 'type' => 'nombre',
+                'libelle' => 'Questions maximum par manche',
+                'aide'    => 'Au-dela, l\'attention retombe et le forfait data des joueurs y passe.',
+                'valeur'  => '20',
+            ],
+            [
+                'cle' => 'simulation.seuil_sans_poules', 'groupe' => 'simulation', 'type' => 'nombre',
+                'libelle' => 'Effectif sous lequel on saute les poules',
+                'aide'    => 'En dessous, on va directement au tableau final.',
+                'valeur'  => '16',
+            ],
+            [
+                'cle' => 'simulation.seuil_duo', 'groupe' => 'simulation', 'type' => 'nombre',
+                'libelle' => 'Effectif a partir duquel le duo est conseille',
+                'aide'    => 'Le duo divise par deux le nombre de repondants et fait jouer les faibles avec les forts.',
+                'valeur'  => '25',
+            ],
+
+            // ---------- Messages prets a coller dans le groupe ----------
+            // Ces textes ne sont PAS l'interface : ce sont des messages que
+            // l'organisateur envoie sur Messenger/WhatsApp. Les emojis y sont
+            // donc a leur place (la regle « pas d'emoji dans le code » vise
+            // l'UI, pas le contenu envoye). Les {{variables}} sont remplacees
+            // a la copie par les vraies valeurs des reglages : le message ne
+            // peut pas se desynchroniser du lien, de la date ou des prix.
+            [
+                'cle' => 'messages.ouverture', 'groupe' => 'messages', 'type' => 'markdown',
+                'libelle' => 'Ouverture des inscriptions',
+                'aide'    => 'Le message d\'annonce a poster en premier dans le groupe.',
+                'valeur'  => "🌿 {{nom_tournoi}} 🌿\n\n"
+                    . "Les inscriptions sont ouvertes ! La {{organisateur}} lance son tournoi de quiz.\n\n"
+                    . "📍 On joue dans CE groupe ({{canal_poules}}). Les phases finales passeront sur {{canal_finales}}.\n"
+                    . "🗓️ Coup d'envoi : {{date_debut}}.\n\n"
+                    . "✍️ Pour t'inscrire, un seul lien :\n{{lien_inscription}}\n\n"
+                    . "⏰ Clôture des inscriptions : {{date_limite}}. Après, on ne prend plus personne.\n\n"
+                    . "🏆 À gagner :\n"
+                    . "• 1er : {{prix_premier}}\n"
+                    . "• 2e : {{prix_deuxieme}}\n"
+                    . "• 3e : {{prix_troisieme}}\n"
+                    . "• Meilleur marqueur : {{prix_meilleur}}\n\n"
+                    . "Pas besoin de forfait : tout se joue ici, dans le groupe. Le lien sert juste à s'inscrire et à suivre le classement.\n\n"
+                    . "Que le meilleur gagne ! 💪",
+            ],
+            [
+                'cle' => 'messages.rappel_cloture', 'groupe' => 'messages', 'type' => 'markdown',
+                'libelle' => 'Rappel — clôture des inscriptions',
+                'aide'    => 'A envoyer quelques heures avant la date limite pour ramasser les retardataires.',
+                'valeur'  => "⏳ DERNIÈRE LIGNE DROITE\n\n"
+                    . "Les inscriptions au {{nom_tournoi}} ferment {{date_limite}}.\n\n"
+                    . "Tu n'es pas encore inscrit ? C'est maintenant ou jamais :\n{{lien_inscription}}\n\n"
+                    . "Après la clôture, la liste est définitive et les poules sont composées. Ne rate pas ça. 🌿",
+            ],
+            [
+                'cle' => 'messages.coup_envoi', 'groupe' => 'messages', 'type' => 'markdown',
+                'libelle' => 'Coup d\'envoi imminent',
+                'aide'    => 'A poster le jour du tournoi, avant la premiere manche. Rappelle la regle du jeu.',
+                'valeur'  => "🔥 ÇA COMMENCE {{date_debut}} 🔥\n\n"
+                    . "Le {{nom_tournoi}} démarre ! Rendez-vous ICI, dans le groupe.\n\n"
+                    . "Comment ça marche :\n"
+                    . "1️⃣ L'animateur pose une question puis annonce STOP.\n"
+                    . "2️⃣ La PREMIÈRE bonne réponse marque le point.\n"
+                    . "3️⃣ Toute réponse après le STOP est nulle.\n\n"
+                    . "⚡ La rapidité fait partie du jeu. L'orthographe approximative est acceptée tant que la réponse est reconnaissable.\n\n"
+                    . "Reste connecté au groupe. Bonne chance à tous ! 🌿",
+            ],
+
+            // ---------- Bloc promotionnel Gextimo / NovafriQ ----------
+            // Contrepartie de l'infra (domaine, sous-domaines, VPS) offerte pour
+            // le tournoi : la page publique met en avant le produit. Groupe
+            // reserve au proprietaire (config herboquiz.groupes_proprietaire) :
+            // un autre admin ne peut ni le retirer ni le modifier.
+            [
+                'cle' => 'promo.actif', 'groupe' => 'promo', 'type' => 'booleen',
+                'libelle' => 'Afficher le bloc « Réalisé par NovafriQ »',
+                'aide'    => 'Masqué par defaut : on garde la promo en arriere-plan (partage, signature) plutot qu\'un bloc visible.',
+                'valeur'  => '0',
+            ],
+            [
+                'cle' => 'promo.titre', 'groupe' => 'promo', 'type' => 'texte',
+                'libelle' => 'Titre du bloc',
+                // Cadre « credit », pas « reclame » : se lit comme une signature,
+                // pas comme une pub. C'est ce qui passe sans agacer.
+                'valeur'  => 'Réalisé par NovafriQ',
+            ],
+            [
+                'cle' => 'promo.texte', 'groupe' => 'promo', 'type' => 'markdown',
+                'libelle' => 'Texte du bloc',
+                'aide'    => 'Ton sobre, informatif : une signature, pas une publicite.',
+                'valeur'  => "Nous concevons des applications sur mesure pour les groupes et les activités du quotidien — comme **Gextimo**, notre outil de gestion.",
+            ],
+            [
+                'cle' => 'promo.cta', 'groupe' => 'promo', 'type' => 'texte',
+                'libelle' => 'Texte du bouton principal',
+                'valeur'  => 'Voir Gextimo',
+            ],
+            [
+                'cle' => 'promo.lien_gextimo', 'groupe' => 'promo', 'type' => 'texte',
+                'libelle' => 'Lien du site Gextimo',
+                'valeur'  => 'https://gextimo.novafriq.africa/',
+            ],
+            [
+                'cle' => 'promo.lien_facebook', 'groupe' => 'promo', 'type' => 'texte',
+                'libelle' => 'Lien de la page Facebook Gextimo',
+                'valeur'  => 'https://www.facebook.com/profile.php?id=61590886627275',
+            ],
+            [
+                'cle' => 'promo.lien_novafriq', 'groupe' => 'promo', 'type' => 'texte',
+                'libelle' => 'Lien du site NovafriQ',
+                'valeur'  => 'https://novafriq.africa',
+            ],
+        ];
+    }
+}
