@@ -1,0 +1,26 @@
+# Backend
+herboquiz_backend/vendor
+herboquiz_backend/.env
+herboquiz_backend/.env.*
+herboquiz_backend/tests
+herboquiz_backend/.git
+herboquiz_backend/.idea
+herboquiz_backend/.vscode
+herboquiz_backend/.phpunit.cache
+herboquiz_backend/.phpunit.result.cache
+herboquiz_backend/storage/logs
+herboquiz_backend/storage/framework/cache/data
+herboquiz_backend/storage/framework/sessions
+herboquiz_backend/storage/framework/views
+herboquiz_backend/storage/*.sqlite
+
+# Frontend
+herboquiz_frontend/node_modules
+herboquiz_frontend/dist
+herboquiz_frontend/.env
+herboquiz_frontend/.env.*
+herboquiz_frontend/.git
+
+# Divers
+.git
+*.html
