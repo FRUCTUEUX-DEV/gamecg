@@ -112,7 +112,8 @@ ENV APP_NAME=HerboQuiz \
     QUEUE_CONNECTION=sync \
     SESSION_MINUTES=720 \
     HERBOQUIZ_PROPRIETAIRE=Kaido \
-    DB_SEED=true
+    DB_SEED=true \
+    DB_SEED_DEMO=false
 
 EXPOSE 8000
 

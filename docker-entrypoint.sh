@@ -13,6 +13,21 @@ if [ "$DB_SEED" = "true" ]; then
     php artisan db:seed --force
 fi
 
+# Optionnel, desactive par defaut : equipes/participants/points de
+# demonstration (memes que ceux utilises pendant les tests). Le seeder
+# lui-meme n'est pas idempotent (relance = doublons) — on ne le lance donc
+# que si aucune equipe n'existe deja, meme si DB_SEED_DEMO reste a "true"
+# apres le premier demarrage.
+if [ "$DB_SEED_DEMO" = "true" ]; then
+    DEJA=$(php artisan tinker --execute="echo \App\Models\Equipe::count();" 2>/dev/null | tail -n 1)
+    if [ "$DEJA" = "0" ]; then
+        echo "==> Seed des donnees de demonstration (equipes, participants, points)..."
+        php artisan db:seed --class=DemoClassementSeeder --force
+    else
+        echo "==> Donnees de demonstration deja presentes (${DEJA} equipe(s)), on ne rejoue pas le seed."
+    fi
+fi
+
 # Render (et la plupart des plateformes Docker) fournissent le port a
 # ecouter via $PORT ; 8000 en repli pour un lancement local.
 PORT="${PORT:-8000}"
