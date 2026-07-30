@@ -31,7 +31,10 @@ ENV VITE_API_URL=/api
 RUN npm run build
 
 # ---------- Etape 2 : image finale (backend + frontend) ----------
-FROM php:8.3-cli-alpine
+# 8.4, pas 8.3 : composer.lock a ete genere avec PHP 8.4 installe en local et
+# verrouille des sous-dependances Symfony qui exigent >= 8.4.1 (composer.json
+# autorise ^8.3, mais un lock deja pose ne redescend pas tout seul).
+FROM php:8.4-cli-alpine
 
 # postgresql-dev : en-tetes necessaires pour compiler pdo_pgsql (client
 # seulement — la base elle-meme est hebergee par Render, pas ici).
