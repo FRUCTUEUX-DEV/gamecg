@@ -21,6 +21,6 @@ herboquiz_frontend/.env
 herboquiz_frontend/.env.*
 herboquiz_frontend/.git
 
-# Divers
+# Divers (ancre "/" : uniquement a la racine, pas herboquiz_frontend/index.html)
 .git
-*.html
+/*.html
